@@ -11,7 +11,8 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 from envs.gridworld import ShortcutGridWorld
-
+from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import CallbackList
 
 class FlattenWrapper(gym.ObservationWrapper):
     def __init__(self, env):
@@ -119,6 +120,16 @@ def train(grid_size=10, num_spurious=1, total_steps=500000,
     print("-" * 60)
 
     model.learn(total_timesteps=total_steps, callback=callback)
+    ########## To save checkpoints. ######################
+    # checkpoint_callback = CheckpointCallback(
+    #     save_freq=5000,
+    #     save_path=f"results/checkpoints/sb3_probes_k{num_spurious}_seed{seed}/",
+    #     name_prefix="model"
+    # )
+
+    # all_callbacks = CallbackList([callback, checkpoint_callback])
+
+    # model.learn(total_timesteps=total_steps, callback=all_callbacks)
 
     checkpoint_dir = f"results/checkpoints/sb3_k{num_spurious}_seed{seed}"
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -194,3 +205,10 @@ if __name__ == "__main__":
                 eval_every=5000,
                 seed=seed
             )
+    # model, callback = train(
+    #     grid_size=10,
+    #     num_spurious=1,
+    #     total_steps=500000,
+    #     eval_every=5000,
+    #     seed=42
+    # )

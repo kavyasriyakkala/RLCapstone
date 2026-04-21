@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import gymnasium as gym
 from gymnasium import spaces
+import os
 
 
 class ShortcutGridWorld(gym.Env):
