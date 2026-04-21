@@ -175,12 +175,22 @@ def plot_results(steps, train_succ, test_succ, delta_t, k, seed):
 #         eval_every=5000,
 #         seed=42
 #     )
+# if __name__ == "__main__":
+#     for seed in [42, 123, 7]:
+#         model, callback = train(
+#             grid_size=10,
+#             num_spurious=1,
+#             total_steps=500000,
+#             eval_every=5000,
+#             seed=seed
+#         )
 if __name__ == "__main__":
-    for seed in [42, 123, 7]:
-        model, callback = train(
-            grid_size=10,
-            num_spurious=1,
-            total_steps=500000,
-            eval_every=5000,
-            seed=seed
-        )
+    for k in [1, 2, 3]:
+        for seed in [42, 123, 7]:
+            model, callback = train(
+                grid_size=10,
+                num_spurious=k,
+                total_steps=500000,
+                eval_every=5000,
+                seed=seed
+            )
