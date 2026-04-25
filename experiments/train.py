@@ -136,6 +136,15 @@ def train(grid_size=10, num_spurious=1, total_steps=500000,
     model.save(f"{checkpoint_dir}/final_model")
     print(f"Model saved to {checkpoint_dir}/final_model")
 
+    np.savez(
+        f"{checkpoint_dir}/logs.npz",
+        steps=np.array(callback.steps_log),
+        train=np.array(callback.train_success),
+        test=np.array(callback.test_success),
+        delta=np.array(callback.delta_t),
+    )
+    print(f"Logs saved to {checkpoint_dir}/logs.npz")
+
     plot_results(callback.steps_log, callback.train_success,
                  callback.test_success, callback.delta_t,
                  num_spurious, seed)
