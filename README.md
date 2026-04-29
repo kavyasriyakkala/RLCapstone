@@ -1,291 +1,246 @@
 # Reward Hacking in Shortcut Gridworlds
 
-This repository studies reward hacking and shortcut learning in reinforcement
-learning. The central question is:
+This project studies **reward hacking** and **shortcut learning** in reinforcement learning.
 
-> When a training environment contains a spurious feature that is perfectly
-> correlated with reward, do RL agents learn the real task or exploit the
-> shortcut?
+The core question is:
 
-The project uses a custom gridworld environment where the true goal and a
-spurious marker overlap during training but separate during testing. This lets us
-measure whether an agent learned to navigate to the real goal or whether it
-learned a brittle shortcut that only works in the training distribution.
+> When a training environment contains a spurious feature that is perfectly correlated with reward, does an RL agent learn the real task or exploit the shortcut?
 
-## Project Summary
+The project uses a custom gridworld where the true goal and a shortcut marker overlap during training, but separate during testing. This setup makes it possible to measure whether agents learned the actual goal or simply followed the shortcut.
 
-The environment provides three observation channels:
+---
 
-1. Agent position.
-2. True goal position.
-3. Spurious shortcut-marker position.
+## Project Flow
 
-During training, the spurious marker is placed directly on top of the true goal.
-During testing, the spurious marker is moved away from the true goal. The reward
-is always tied only to the true goal:
+### 1. Environment
+
+The main environment is:
 
 ```text
-reward = +1.0   if the agent reaches the true goal
-reward = -0.01  otherwise
+envs/gridworld.py
 ```
 
-The spurious marker never directly gives reward. It only becomes useful because
-it is correlated with the true goal during training. If an agent follows the
-spurious marker during testing, it will fail unless it eventually reaches the
-actual goal.
-
-The main behavioral metric is the shortcut gap:
+It defines a shortcut gridworld with three observation channels:
 
 ```text
-delta(t) = train_success(t) - test_success(t)
+channel 0: agent position
+channel 1: true goal position
+channel 2: spurious shortcut marker position
 ```
 
-A large positive shortcut gap means the agent performs well when the shortcut is
-valid but fails when the shortcut is broken.
+During training:
+
+```text
+spurious marker = true goal
+```
+
+During testing:
+
+```text
+spurious marker != true goal
+```
+
+The reward is always based only on reaching the true goal. The shortcut marker does not directly give reward, but it is perfectly correlated with reward during training.
+
+This creates a reward-hacking setting: an agent can perform well in training by following the marker, but fail at test time when the marker is moved.
+
+---
+
+## Main Metric
+
+The main behavioral metric is the **shortcut gap**:
+
+```text
+shortcut gap = train success - test success
+```
+
+A large positive shortcut gap means the agent succeeds when the shortcut is valid, but fails when the shortcut is broken.
+
+---
 
 ## Repository Structure
 
 ```text
 RLCapstone/
-  envs/
-    gridworld.py                  Custom shortcut gridworld environment
-  agents/
-    ppo_agent.py                  Earlier custom PPO implementation
-  experiments/
-    train.py                      Baseline PPO training
-    train_interventions.py        PPO interventions: vanilla, L2, augmentation, PAR
-    train_algorithms.py           PPO, A2C, DQN algorithm-comparison training
-    plot_algorithm_comparison.py  Aggregate PPO/A2C/DQN comparison plots
-    linear_probes.py              Original PPO checkpoint probing
-    train_probe_checkpoints.py    Checkpointed A2C/DQN training for probe curves
-    probe_checkpoint_curves.py    A2C/DQN probe curves over training steps
-    ablation_eval.py              Observation-channel ablation evaluation
-  results/
-    figures/                      Saved figures used in the report
-    algorithms/                   A2C/DQN/PPO logs and trained models
-    interventions/                PPO intervention logs and models
-  RESULTS.md                      Concise result summary
-  requirements.txt                Python dependencies
+│
+├── envs/
+│   ├── gridworld.py
+│   └── __init__.py
+│
+├── agents/
+│   ├── ppo_agent.py
+│   └── __init__.py
+│
+├── experiments/
+│   ├── train.py
+│   ├── train_algorithms.py
+│   ├── train_interventions.py
+│   ├── train_probe_checkpoints.py
+│   ├── linear_probes.py
+│   ├── probe_checkpoint_curves.py
+│   ├── ablation_eval.py
+│   ├── plot_algorithm_comparison.py
+│   ├── plot_interventions.py
+│   ├── plot_interventions_multiseed.py
+│   ├── plot_k_comparison.py
+│   ├── plot_seeds.py
+│   └── replot_probes.py
+│
+├── results/
+│   ├── figures/
+│   ├── algorithms/
+│   └── interventions/
+│
+├── utils/
+├── test_env.py
+├── requirements.txt
+├── RESULTS.md
+└── README.md
 ```
 
-## Environment Design
+---
 
-The core environment is `ShortcutGridWorld` in `envs/gridworld.py`.
+## Important Files
 
-For a `10x10` grid, the observation has shape:
+### Environment
 
 ```text
-(3, 10, 10)
+envs/gridworld.py
 ```
 
-The three channels are:
+Defines the custom shortcut gridworld environment. This is the core environment used by all training and evaluation scripts.
+
+---
+
+### Baseline PPO Training
 
 ```text
-channel 0: agent location
-channel 1: true goal location
-channel 2: spurious marker location
+experiments/train.py
 ```
 
-For Stable-Baselines3 training, the observation is flattened before being passed
-to an MLP policy:
+Runs the baseline PPO experiment on the shortcut gridworld.
+
+Use this first if you want to understand the simplest training setup.
+
+---
+
+### Algorithm Comparison
 
 ```text
-(3, 10, 10) -> 300-dimensional vector
+experiments/train_algorithms.py
 ```
 
-At reset time, the environment randomly samples an agent position and a true goal
-position. The spurious marker is then placed differently depending on the split:
-
-```python
-if train_mode:
-    spurious = goal_pos
-else:
-    spurious = random_position_away_from_goal
-```
-
-The episode ends when either:
-
-1. The agent reaches the true goal.
-2. The maximum step limit is reached.
-
-The maximum episode length is:
+Trains and compares multiple RL algorithms:
 
 ```text
-max_steps = grid_size * grid_size * 4
+PPO
+A2C
+DQN
 ```
 
-For a `10x10` grid this is `400` steps.
+This is the main script for testing whether shortcut learning appears across different RL algorithms.
 
-## Why This Creates Reward Hacking
-
-The true reward function depends only on the goal:
+Plot the comparison with:
 
 ```text
-reward = 1 if agent_pos == goal_pos
+experiments/plot_algorithm_comparison.py
 ```
 
-However, during training:
+---
+
+### PPO Interventions
 
 ```text
-spurious_pos == goal_pos
+experiments/train_interventions.py
 ```
 
-So the spurious marker is not causal, but it is perfectly predictive. An agent
-can maximize training reward by learning:
+Runs PPO with different intervention methods designed to reduce shortcut reliance:
 
 ```text
-go to the spurious marker
+vanilla       standard PPO
+l2            PPO with weight decay
+augmentation  observation augmentation
+par           reward transformation wrapper
 ```
 
-instead of learning:
+Plot intervention results with:
 
 ```text
-go to the true goal channel
+experiments/plot_interventions.py
+experiments/plot_interventions_multiseed.py
 ```
 
-Testing breaks this shortcut by moving the spurious marker away from the goal. If
-the policy learned the shortcut, test success drops and the shortcut gap becomes
-positive.
+---
 
-## Algorithms
-
-The project uses Stable-Baselines3 implementations of:
-
-- PPO
-- A2C
-- DQN
-
-All three use `MlpPolicy` over the flattened gridworld observation.
-
-### PPO
-
-PPO learns a stochastic policy:
+### Linear Probes
 
 ```text
-pi_theta(a | s)
+experiments/linear_probes.py
+experiments/train_probe_checkpoints.py
+experiments/probe_checkpoint_curves.py
 ```
 
-and a value function:
+These scripts analyze whether trained models encode information about:
 
 ```text
-V_phi(s)
+true goal position
+spurious marker position
 ```
 
-The advantage estimate measures whether an action was better or worse than
-expected:
+The probe experiments help inspect internal representations, but the main evidence for reward hacking comes from behavior under train/test distribution shift.
+
+---
+
+### Ablation Evaluation
 
 ```text
-A_t = return_t - V(s_t)
+experiments/ablation_eval.py
 ```
 
-Stable-Baselines3 PPO uses generalized advantage estimation in practice, based on
-temporal-difference errors:
+Evaluates trained agents while modifying or removing observation channels. This helps test which parts of the observation the policy depends on.
+
+---
+
+### Results
 
 ```text
-delta_t = r_t + gamma * V(s_{t+1}) - V(s_t)
+RESULTS.md
+results/
 ```
 
-PPO compares the new policy to the old policy using:
+`RESULTS.md` summarizes the main findings.
 
-```text
-r_t(theta) = pi_theta(a_t | s_t) / pi_old(a_t | s_t)
+The `results/` directory stores trained models, logs, and generated figures.
+
+---
+
+## Running the Project
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
 ```
 
-The clipped PPO objective is:
-
-```text
-L_clip(theta) = E[min(r_t(theta) * A_t,
-                      clip(r_t(theta), 1 - epsilon, 1 + epsilon) * A_t)]
-```
-
-In this project, if moving toward the spurious marker leads to reward during
-training, those actions receive positive advantage and PPO increases their
-probability.
-
-### A2C
-
-A2C is also an actor-critic method. It learns:
-
-```text
-actor:  pi_theta(a | s)
-critic: V_phi(s)
-```
-
-The actor loss is:
-
-```text
-L_actor = -log pi_theta(a_t | s_t) * A_t
-```
-
-The critic loss is:
-
-```text
-L_critic = (V_phi(s_t) - return_t)^2
-```
-
-A2C differs from PPO because it does not use PPO's clipped probability-ratio
-objective. It directly pushes actions up or down according to the advantage. In
-our experiments, A2C did not develop a large shortcut gap, but it also had low
-train and test success, meaning it mostly failed to learn the task well.
-
-### DQN
-
-DQN is value-based. Instead of directly learning a policy, it learns:
-
-```text
-Q_theta(s, a)
-```
-
-which estimates the expected future reward from taking action `a` in state `s`.
-The policy chooses:
-
-```text
-a = argmax_a Q(s, a)
-```
-
-DQN is trained using the Bellman target:
-
-```text
-y_t = r_t + gamma * max_a Q_target(s_{t+1}, a)
-```
-
-and minimizes:
-
-```text
-L_DQN = (Q_theta(s_t, a_t) - y_t)^2
-```
-
-DQN also uses a replay buffer and a target network. In this project, DQN strongly
-learned the shortcut: it achieved high training success but low test success.
-
-## PPO Interventions
-
-The project also compares several PPO variants:
-
-- `vanilla`: standard PPO baseline.
-- `l2`: PPO with weight decay.
-- `augmentation`: PPO with observation-channel jitter during training.
-- `par`: PPO with reward transformation through `PARRewardWrapper`.
-
-These methods are intended to test whether regularization, augmentation, or
-reward transformation reduces shortcut reliance.
-
-## Experiments
-
-### Baseline PPO
+Run the baseline PPO experiment:
 
 ```bash
 python experiments/train.py
 ```
 
-This trains PPO on the shortcut gridworld and saves:
+Run algorithm comparison experiments:
 
-```text
-results/checkpoints/
-results/figures/
+```bash
+python experiments/train_algorithms.py --all --algorithms a2c,dqn
 ```
 
-### PPO Interventions
+Plot aggregate algorithm results:
+
+```bash
+python experiments/plot_algorithm_comparison.py
+```
+
+Run PPO intervention experiments:
 
 ```bash
 python experiments/train_interventions.py --method vanilla --k 1 --seed 42
@@ -294,44 +249,19 @@ python experiments/train_interventions.py --method augmentation --k 1 --seed 42
 python experiments/train_interventions.py --method par --k 1 --seed 42
 ```
 
-Plot the intervention comparison with:
+Plot intervention results:
 
 ```bash
 python experiments/plot_interventions.py
 ```
 
-### Algorithm Comparison
-
-Train A2C and DQN across `k=1,2,3` and seeds `42,123,7`:
-
-```bash
-python experiments/train_algorithms.py --all --algorithms a2c,dqn
-```
-
-Plot aggregate comparisons:
-
-```bash
-python experiments/plot_algorithm_comparison.py
-```
-
-The aggregate plot is saved to:
-
-```text
-results/figures/algorithm_comparison_aggregate.png
-```
-
-### Linear Probes
-
-Linear probes test whether hidden activations encode the true goal position or
-the spurious marker position.
-
-For A2C/DQN probe curves, first train checkpointed models:
+Run probe checkpoint training:
 
 ```bash
 python experiments/train_probe_checkpoints.py --targets a2c,dqn --k 1 --seed 42
 ```
 
-Then generate probe curves:
+Generate probe curves:
 
 ```bash
 python experiments/probe_checkpoint_curves.py \
@@ -342,89 +272,34 @@ python experiments/probe_checkpoint_curves.py \
   --checkpoint-stride 5
 ```
 
-This saves:
+---
+
+## How to Read the Project
+
+A good order for newcomers is:
+
+1. Start with `envs/gridworld.py` to understand the environment.
+2. Read `experiments/train.py` for the baseline PPO setup.
+3. Read `experiments/train_algorithms.py` to see how PPO, A2C, and DQN are compared.
+4. Read `experiments/train_interventions.py` to understand attempted fixes.
+5. Look at `RESULTS.md` and `results/figures/` to understand the final outcomes.
+6. Read the probe scripts if you want to understand representation-level analysis.
+
+---
+
+## Summary
+
+This project shows how reinforcement learning agents can exploit a shortcut feature that is predictive during training but unreliable during testing.
+
+The key idea is simple:
 
 ```text
-results/figures/linear_probes_a2c_k1_seed42.png
-results/figures/linear_probes_dqn_k1_seed42.png
+Training: shortcut marker overlaps with the true goal.
+Testing: shortcut marker moves away from the true goal.
 ```
 
-## Results
+If an agent learned the real task, it should still go to the true goal.
 
-See `RESULTS.md` for the full summary. The main results are:
+If it learned the shortcut, test performance drops.
 
-- PPO shows a positive shortcut gap, meaning the policy partially relies on the
-  training shortcut.
-- DQN shows the strongest shortcut exploitation: near-perfect training success but
-  poor test success.
-- A2C does not show a strong shortcut gap, but it also fails to learn the task
-  well in this setup.
-- PAR PPO reduces the shortcut gap compared with vanilla PPO for `k=1`,
-  `seed=42`.
-- Linear probes show that both goal and spurious information are decodable from
-  A2C/DQN hidden activations, but probes alone do not prove which feature the
-  policy uses for action selection.
-
-## Key Figures
-
-```text
-results/figures/sb3_training_k1_seed42.png
-results/figures/intervention_comparison_k1_seed42.png
-results/figures/algorithm_comparison_aggregate.png
-results/figures/linear_probes_k1_seed42.png
-results/figures/linear_probes_a2c_k1_seed42.png
-results/figures/linear_probes_dqn_k1_seed42.png
-```
-
-## Installation
-
-Create and activate a virtual environment:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-If Matplotlib cache warnings appear, use a local cache directory:
-
-```bash
-MPLCONFIGDIR=.matplotlib-cache python experiments/plot_algorithm_comparison.py
-```
-
-## Reproducing the Main Algorithm Comparison
-
-From the repository root:
-
-```bash
-source .venv/bin/activate
-
-python experiments/train_algorithms.py --all --algorithms a2c,dqn
-python experiments/plot_algorithm_comparison.py
-```
-
-For probe curves:
-
-```bash
-python experiments/train_probe_checkpoints.py --targets a2c,dqn --k 1 --seed 42
-python experiments/probe_checkpoint_curves.py \
-  --targets a2c,dqn \
-  --k 1 \
-  --seed 42 \
-  --episodes 20 \
-  --checkpoint-stride 5
-```
-
-## Interpretation
-
-This project demonstrates that shortcut learning is a distribution-shift problem:
-the training reward can be maximized using a feature that is predictive in
-training but not reliable in testing. The DQN results show that this failure mode
-is not specific to PPO. The probe results show that hidden representations can
-contain both true-goal and shortcut information, so behavioral evaluation under
-test-time shortcut breaks is essential.
+The shortcut gap captures this failure mode.
