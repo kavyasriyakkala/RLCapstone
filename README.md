@@ -94,7 +94,6 @@ RLCapstone/
 ├── utils/
 ├── test_env.py
 ├── requirements.txt
-├── RESULTS.md
 └── README.md
 ```
 
@@ -201,19 +200,6 @@ Evaluates trained agents while modifying or removing observation channels. This 
 
 ---
 
-### Results
-
-```text
-RESULTS.md
-results/
-```
-
-`RESULTS.md` summarizes the main findings.
-
-The `results/` directory stores trained models, logs, and generated figures.
-
----
-
 ## Running the Project
 
 Install dependencies:
@@ -282,8 +268,7 @@ A good order for newcomers is:
 2. Read `experiments/train.py` for the baseline PPO setup.
 3. Read `experiments/train_algorithms.py` to see how PPO, A2C, and DQN are compared.
 4. Read `experiments/train_interventions.py` to understand attempted fixes.
-5. Look at `RESULTS.md` and `results/figures/` to understand the final outcomes.
-6. Read the probe scripts if you want to understand representation-level analysis.
+5. Read the probe scripts if you want to understand representation-level analysis.
 
 ---
 
